@@ -128,8 +128,9 @@ type Backend interface {
 	// before Init, from any goroutine.
 	ReplaceFile(target, replacement string) error
 
-	// NewTray makes a tray icon. id is TrayOptions.ID, which Linux needs
-	// as the icon is made; the other backends take it through Tray.SetID.
+	// NewTray makes a tray icon. id is TrayOptions.ID, which Linux and macOS
+	// use as the icon is made (macOS sets NSStatusItem.autosaveName before
+	// realizing its button); other backends take it through Tray.SetID.
 	NewTray(id string, h TrayHandler) (Tray, error)
 	// RegisterHotkey makes accelerator a global shortcut. description says
 	// what it does, for desktops that show the app's shortcuts to the

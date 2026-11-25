@@ -1497,11 +1497,12 @@ func keyEquivalent(acc string) (string, uint) {
 // Tray icons (NSStatusItem).
 
 type tray struct {
-	b      *Backend
-	h      platform.TrayHandler
-	item   id
-	button id
-	owner  int
+	b        *Backend
+	h        platform.TrayHandler
+	item     id
+	button   id
+	owner    int
+	autosave string
 	// dark is the menu bar's appearance, as last told.
 	dark bool
 	// mono draws the title in the monospaced font (SetTitleMonospaced).
@@ -1560,7 +1561,7 @@ func registerTrayTarget() {
 
 var trayTarget id
 
-func (b *Backend) NewTray(_ string, h platform.TrayHandler) (platform.Tray, error) {
+func (b *Backend) NewTray(id string, h platform.TrayHandler) (platform.Tray, error) {
 	if trayTarget == 0 {
 		trayTarget = alloc("MyGoTrayTarget")
 	}
@@ -1568,6 +1569,13 @@ func (b *Backend) NewTray(_ string, h platform.TrayHandler) (platform.Tray, erro
 	withPool(func() {
 		bar := send(class("NSStatusBar"), "systemStatusBar")
 		t.item = retain(msgFloatID(bar, sel("statusItemWithLength:"), -1)) // NSVariableStatusItemLength
+		// Set the autosave name before touching button/effectiveAppearance so
+		// AppKit binds the item to its saved menu bar position on creation
+		// rather than falling back to the transient default slot.
+		if id != "" {
+			send(t.item, "setAutosaveName:", uintptr(nsString(id)))
+			t.autosave = id
+		}
 		t.button = send(t.item, "button")
 		send(t.button, "setTarget:", uintptr(trayTarget))
 		send(t.button, "setAction:", uintptr(sel("mygoTrayClicked:")))
@@ -1599,6 +1607,10 @@ func (t *tray) Dark() bool {
 // SetID gives the status item an autosave name: macOS keeps under it where
 // the user dragged the item with ⌘, and puts it there as it is made again.
 func (t *tray) SetID(id string) {
+	if id == t.autosave {
+		return
+	}
+	t.autosave = id
 	withPool(func() { send(t.item, "setAutosaveName:", uintptr(nsString(id))) })
 }
 
