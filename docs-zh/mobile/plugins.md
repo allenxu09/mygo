@@ -133,7 +133,7 @@ C 通过原生模块进入手机：模块的 Kotlin 用 CMake 构建 C（在它�
 
 ### 链接进 Go 的 C
 
-应用的 Go 代码用 cgo 链接的 C 库（而不是由原生模块封装的库）在 Android 上可能需要 JVM，例如一个媒体库：它把自己的线程附加到 JVM，并调用 Android 的音频类。`mygo.JavaVM` 返回进程的 `JavaVM*`，`mygo.AndroidContext` 返回应用 `Context` 的 JNI 全局引用，在进程的整个生命周期内都有效。在其他平台上，以及应用的 `main` 运行之前（例如在 `init` 函数中），两者都是 0：
+应用的 Go 代码用 cgo 链接的 C 库（而不是由原生模块封装的库）在 Android 上可能需要 JVM，例如一个媒体库：它把自己的线程附加到 JVM，并调用 Android 的音频类。`mygo.JavaVM` 返回进程的 `JavaVM*`，`mygo.AndroidContext` 返回应用 `Context` 的 JNI 全局引用，在进程的整个生命周期内都有效。在其他平台上两者都是 0；在应用的 `main` 运行之前（例如在 `init` 函数中）也可能是 0：请在 `main` 中或之后调用它们。
 
 ```go
 //go:build android

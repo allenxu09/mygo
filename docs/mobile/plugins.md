@@ -157,7 +157,8 @@ module wraps, may need the JVM on Android: a media library, for one, that
 attaches its threads and calls Android's audio classes. `mygo.JavaVM` returns
 the process's `JavaVM*`, and `mygo.AndroidContext` a JNI global reference to
 the application's `Context`, valid for the life of the process. Both are 0 on
-other platforms, and before the app's `main` runs, as in `init` functions:
+other platforms, and may be 0 before the app's `main` runs, as in `init`
+functions: call them from `main` or later.
 
 ```go
 //go:build android
