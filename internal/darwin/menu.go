@@ -1773,9 +1773,27 @@ func (t *tray) Destroy() {
 		return
 	}
 	delete(t.b.trays, t.button)
-	send(t.button, "removeObserver:forKeyPath:", uintptr(trayTarget), uintptr(nsString("effectiveAppearance")))
-	dropOwner(t.owner)
-	send(send(class("NSStatusBar"), "systemStatusBar"), "removeStatusItem:", uintptr(t.item))
-	release(t.item)
+	withPool(func() {
+		send(t.button, "removeObserver:forKeyPath:", uintptr(trayTarget), uintptr(nsString("effectiveAppearance")))
+		dropOwner(t.owner)
+		// AppKit's removeStatusItem: deletes "NSStatusItem Preferred Position <name>"
+		// from NSUserDefaults, wiping the user's ⌘-dragged position whenever an app
+		// destroys its tray icon on quit. Preserve any saved position across removal.
+		var savedPos, posKey id
+		if t.autosave != "" {
+			defaults := send(class("NSUserDefaults"), "standardUserDefaults")
+			posKey = nsString("NSStatusItem Preferred Position " + t.autosave)
+			if v := send(defaults, "objectForKey:", uintptr(posKey)); v != 0 {
+				savedPos = retain(v)
+			}
+		}
+		send(send(class("NSStatusBar"), "systemStatusBar"), "removeStatusItem:", uintptr(t.item))
+		if savedPos != 0 {
+			defaults := send(class("NSUserDefaults"), "standardUserDefaults")
+			send(defaults, "setObject:forKey:", uintptr(savedPos), uintptr(posKey))
+			release(savedPos)
+		}
+		release(t.item)
+	})
 	t.item = 0
 }
