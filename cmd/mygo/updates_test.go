@@ -422,8 +422,6 @@ func main() {
 	}
 }
 
-// TestWriteDeltas makes delta updates from the versions a published
-// manifest lists.
 // TestUnsignedUpdateWarning warns when the update of a macOS build would
 // hold a bundle that mygo build did not sign: off a Mac, without
 // macos.signCommand.
@@ -544,6 +542,8 @@ func TestBuildSignCommandBeforeUpdate(t *testing.T) {
 	}
 }
 
+// TestWriteDeltas makes delta updates from the versions a published
+// manifest lists.
 func TestWriteDeltas(t *testing.T) {
 	pub, priv, _ := ed25519.GenerateKey(nil)
 	t.Setenv("MYGO_UPDATER_PRIVATE_KEY", base64.StdEncoding.EncodeToString(priv))
