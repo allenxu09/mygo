@@ -259,3 +259,66 @@ func TestTextAreaNoWrapRTL(t *testing.T) {
 		t.Errorf("at the end, the caret at %v of the view scrolled %v, want %v", at, ed.scrollX, l.Lines[0].X)
 	}
 }
+
+// TestTextAreaNoWrapStateless checks that NoWrap tells a text area by the
+// control it is, not by its state: a buffer's text area scrolls sideways
+// too, and Key may follow NoWrap on other elements.
+func TestTextAreaNoWrapStateless(t *testing.T) {
+	buf := NewTextBuffer(noWrapURLs)
+	tt := NewTester(func(c *Context) {
+		Text(c, "label").NoWrap().Key("label")
+		TextAreaBuffer(c.Key("area"), buf).NoWrap().Width(300).Height(120)
+	}, 400, 300)
+	tt.Frame()
+	for _, st := range tt.rt.states {
+		if st.editor != nil {
+			if st.flags&flagScrollX == 0 || st.contentW <= float64(st.w) {
+				t.Errorf("a NoWrap buffer area does not scroll sideways: flags %b, content %v of %v", st.flags, st.contentW, st.w)
+			}
+			return
+		}
+	}
+	t.Fatal("no text area")
+}
+
+// TestTextAreaNoWrapEditsExtent checks that edits which add and remove
+// paragraphs keep each paragraph's extent with it: the content stays as
+// wide as an area built afresh with the same text measures it.
+func TestTextAreaNoWrapEditsExtent(t *testing.T) {
+	long := strings.Repeat("wide ", 40)
+	s := "a\n" + long + "\nb\nc"
+	tt, st, _, scroll := noWrapArea(t, &s, true)
+	check := func(what string) {
+		t.Helper()
+		tt.Frame()
+		fresh := s
+		_, _, _, want := noWrapArea(t, &fresh, true)
+		if scroll.MaxX != want.MaxX {
+			t.Errorf("%s: scrolls %v sideways, an area built afresh %v", what, scroll.MaxX, want.MaxX)
+		}
+	}
+	tt.Press(20, 20)
+	tt.Release(20, 20)
+	tt.Key(Ctrl, KeyHome)
+	tt.Key(0, KeyEnd)
+	tt.Key(0, KeyEnter) // a paragraph after "a"
+	tt.Key(0, KeyEnter)
+	check("two paragraphs added before the wide one")
+	tt.Key(0, KeyBackspace)
+	tt.Key(0, KeyBackspace)
+	check("removed again")
+	tt.Key(0, KeyDown)
+	tt.Key(0, KeyHome)
+	for range 20 {
+		tt.Key(Shift, KeyRight)
+	}
+	tt.Key(0, KeyBackspace) // the wide one narrower
+	check("the widest paragraph narrowed")
+	tt.Key(Ctrl, KeyHome)
+	tt.Key(Shift|Ctrl, KeyEnd)
+	tt.Key(0, KeyBackspace)
+	check("all deleted")
+	if st.contentW > float64(st.w) {
+		t.Errorf("an empty area is %v wide in a box %v wide", st.contentW, st.w)
+	}
+}

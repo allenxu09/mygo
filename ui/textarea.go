@@ -276,11 +276,16 @@ func (a *area) editedExt(first, n, after, total int) {
 			a.extOK = false
 		}
 	}
-	if n == after {
-		clear(a.ext[first : first+n])
-		return
+	// The after paragraphs in place of the n, unmeasured, the rest moved
+	// along (by hand rather than slices.Replace, which grows every app).
+	old := len(a.ext)
+	end := old - n + after
+	if end > old {
+		a.ext = slices.Grow(a.ext, end-old)[:end]
 	}
-	a.ext = slices.Replace(a.ext, first, first+n, make([][2]float32, after)...)
+	copy(a.ext[first+after:end], a.ext[first+n:old])
+	clear(a.ext[first : first+after])
+	a.ext = a.ext[:end]
 }
 
 // extents returns how far left and right of the view's edges at 0 the

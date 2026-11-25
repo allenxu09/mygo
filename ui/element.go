@@ -2059,7 +2059,8 @@ func (e *node) NoWrap() *node { e.setNoWrap(true); return e }
 // sideways, scroll that way too.
 func (e *node) setNoWrap(on bool) {
 	e.noWrap = on
-	if e.kind != kindInput || e.st == nil || e.st.editor == nil || e.st.editor.area == nil {
+	// By the control it is, not its state, so that Key may follow.
+	if e.kind != kindInput || e.widget != "TextArea" && e.widget != "TextAreaBuffer" {
 		return
 	}
 	if on {
