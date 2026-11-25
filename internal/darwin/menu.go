@@ -1497,11 +1497,13 @@ func keyEquivalent(acc string) (string, uint) {
 // Tray icons (NSStatusItem).
 
 type tray struct {
-	b        *Backend
-	h        platform.TrayHandler
-	item     id
-	button   id
-	owner    int
+	b      *Backend
+	h      platform.TrayHandler
+	item   id
+	button id
+	owner  int
+	// autosave is the item's autosave name (SetID), under which macOS
+	// keeps its place in the menu bar.
 	autosave string
 	// dark is the menu bar's appearance, as last told.
 	dark bool
@@ -1561,7 +1563,7 @@ func registerTrayTarget() {
 
 var trayTarget id
 
-func (b *Backend) NewTray(name string, h platform.TrayHandler) (platform.Tray, error) {
+func (b *Backend) NewTray(_ string, h platform.TrayHandler) (platform.Tray, error) {
 	if trayTarget == 0 {
 		trayTarget = alloc("MyGoTrayTarget")
 	}
@@ -1569,13 +1571,6 @@ func (b *Backend) NewTray(name string, h platform.TrayHandler) (platform.Tray, e
 	withPool(func() {
 		bar := send(class("NSStatusBar"), "systemStatusBar")
 		t.item = retain(msgFloatID(bar, sel("statusItemWithLength:"), -1)) // NSVariableStatusItemLength
-		// Set the autosave name before touching button/effectiveAppearance so
-		// AppKit binds the item to its saved menu bar position on creation
-		// rather than falling back to the transient default slot.
-		if name != "" {
-			send(t.item, "setAutosaveName:", uintptr(nsString(name)))
-			t.autosave = name
-		}
 		t.button = send(t.item, "button")
 		send(t.button, "setTarget:", uintptr(trayTarget))
 		send(t.button, "setAction:", uintptr(sel("mygoTrayClicked:")))
@@ -1607,9 +1602,6 @@ func (t *tray) Dark() bool {
 // SetID gives the status item an autosave name: macOS keeps under it where
 // the user dragged the item with ⌘, and puts it there as it is made again.
 func (t *tray) SetID(name string) {
-	if name == t.autosave {
-		return
-	}
 	t.autosave = name
 	withPool(func() { send(t.item, "setAutosaveName:", uintptr(nsString(name))) })
 }
@@ -1773,27 +1765,30 @@ func (t *tray) Destroy() {
 		return
 	}
 	delete(t.b.trays, t.button)
+	// Removing a status item deletes the place the user dragged it to with
+	// ⌘ ("NSStatusItem Preferred Position <name>" in the app's defaults),
+	// and freeing it deletes it again: an app that removes its icon as it
+	// quits would find it back at the left. Keep the place and put it back
+	// once the item is gone.
+	var key, pos id
 	withPool(func() {
+		if t.autosave != "" {
+			key = retain(nsString("NSStatusItem Preferred Position " + t.autosave))
+			pos = retain(send(send(class("NSUserDefaults"), "standardUserDefaults"), "objectForKey:", uintptr(key)))
+		}
 		send(t.button, "removeObserver:forKeyPath:", uintptr(trayTarget), uintptr(nsString("effectiveAppearance")))
 		dropOwner(t.owner)
-		// AppKit's removeStatusItem: deletes "NSStatusItem Preferred Position <name>"
-		// from NSUserDefaults, wiping the user's ⌘-dragged position whenever an app
-		// destroys its tray icon on quit. Preserve any saved position across removal.
-		var savedPos, posKey id
-		if t.autosave != "" {
-			defaults := send(class("NSUserDefaults"), "standardUserDefaults")
-			posKey = nsString("NSStatusItem Preferred Position " + t.autosave)
-			if v := send(defaults, "objectForKey:", uintptr(posKey)); v != 0 {
-				savedPos = retain(v)
-			}
-		}
 		send(send(class("NSStatusBar"), "systemStatusBar"), "removeStatusItem:", uintptr(t.item))
-		if savedPos != 0 {
-			defaults := send(class("NSUserDefaults"), "standardUserDefaults")
-			send(defaults, "setObject:forKey:", uintptr(savedPos), uintptr(posKey))
-			release(savedPos)
-		}
 		release(t.item)
 	})
 	t.item = 0
+	if pos != 0 {
+		withPool(func() {
+			send(send(class("NSUserDefaults"), "standardUserDefaults"), "setObject:forKey:", uintptr(pos), uintptr(key))
+		})
+		release(pos)
+	}
+	if key != 0 {
+		release(key)
+	}
 }
